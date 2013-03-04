@@ -1,0 +1,18 @@
+SETUP
+follow steps
+3,4 (5)
+
+replace in file "pintos"
+line
+103 bochs -> qemu
+621 qemu -> qemu-system-i386
+622 comment the line with #
+
+
+
+COMPILING
+for i in threads userprog vm filesys; do make -C $i; done
+
+test installation of pintos
+/utils/pintos run alarm-multiple
+
