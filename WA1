@@ -1,0 +1,14 @@
+
+	READ, READ, READ
+
+PART1
+
+
+PART2
+- inverse priority
+H ~~~lock(R)
+M ~~~~~while(true)
+L ~lock(r)~|
+
+nesta situação o processo de prioridade M vai monopolizar o CPU pois o processo de prioridade baixa bloqueou um recurso do qual o processo H quer utilizar.
+para garantir que todos os processos evoluem, o processo H cede a sua prioridade (alta) ao processo que está a bloquear a sua execução para que este execute o mais rápido possível. depois o processo L libertar o recurso, volta a ter a sua prioridade baixa (low).
