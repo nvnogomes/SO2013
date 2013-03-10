@@ -1,0 +1,85 @@
++----------------------+
+| Sistemas de Operação |
+|                      |
+|  PROJECTO1           |
+|  DESIGN DOCUMENT     |
++----------------------+
+
+---- GROUP ----
+Nuno Gomes <p111082@campus.fct.unl.pt>
+Serhiy Moskovchuk <p111082@campus.fct.unl.pt>
+
+
+---- PRELIMINARIES ----
+Appendix D: Project Documentation
+100
+>> If you have any preliminary comments on your submission, notes for
+>> the TAs, or extra credit, please give them here.
+(This is a sample design document.)
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, and lecture notes.
+None.
+
+
+JOIN
+====
+---- DATA STRUCTURES ----
+>> Copy here the declaration of each new or changed ‘struct’ or ‘struct’
+>> member, global or static variable, ‘typedef’, or enumeration.
+>> Identify the purpose of each in 25 words or less.
+A "latch" is a new synchronization primitive. Acquires block
+until the first release. Afterward, all ongoing and future
+acquires pass immediately.
+
+---- ALGORITHMS ----
+timer_sleep: alterações feitas têm o intuito de colocar a thread em modo
+bloqueado. Bloquear a thread e invocar o escalonador é feito com a chamada a
+função thread.thread_block().
+
+TODO
+desbloquear threads bloqueadas
+ticks...
+nova estrutura de dados?
+
+
+
+---- SYNCHRONIZATION ----
+>>
+>>
+>>
+>>
+>>
+Consider parent thread P with child thread C. How do you ensure
+proper synchronization and avoid race conditions when P calls wait(C)
+before C exits? After C exits? How do you ensure that all resources
+are freed in each case? How about when P terminates without waiting,
+before C exits? After C exits? Are there any special cases?
+C waits in thread_exit() for P to die before it finishes its own
+exit, using the can_die semaphore "down"ed by C and "up"ed by P as
+it exits. Regardless of whether whether C has terminated, there
+is no race on wait(C), because C waits for P’s permission before
+it frees itself.
+
+---- RATIONALE ----
+
+
+
+TODO
+
+
+>> Critique your design, pointing out advantages and disadvantages in
+>> your design choices.
+This design has the advantage of simplicity. Encapsulating most
+of the synchronization logic into a new "latch" structure
+abstracts what little complexity there is into a separate layer,
+making the design easier to reason about. Also, all the new data
+members are in ‘struct thread’, with no need for any extra dynamic
+allocation, etc., that would require extra management code.
+On the other hand, this design is wasteful in that a child thread
+cannot free itself before its parent has terminated. A parent
+thread that creates a large number of short-lived child threads
+could unnecessarily exhaust kernel memory. This is probably
+acceptable for implementing kernel threads, but it may be a bad
+idea for use with user processes because of the larger number of
+resources that user processes tend to own.
