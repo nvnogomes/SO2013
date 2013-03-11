@@ -31,13 +31,6 @@ static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
 
-struct waiting_thread
-  {
-    struct thread thread;
-    int64_t wait;
-  };
-
-
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -103,21 +96,8 @@ timer_sleep (int64_t ticks)
   // interrupts must be on
   ASSERT (intr_get_level () == INTR_ON);
 
-  struct thread *cur = thread_current ();
-  cur->status = THREAD_BLOCKED;
-  if( list_empty(&ready_list) ) {
-    thread_yield();
-  }
-  else {
-    struct waiting wthread;
-    wthread->thread = cur;
-    wthread->wait = timer_ticks() + ticks;
-    list_push_back(&timed_list,&wthread);
 
-    // setting current thread status to BLOCKED
-    // schedule is called right after the status change
-    thread_block();
-  }
+  thread_sleep( timer_ticks() + ticks );
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

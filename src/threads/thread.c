@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of all the process that were given a time to sleep */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,6 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -117,7 +121,7 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
-/* Called by the timer interrupt handler at each timer tick.
+/** Called by the TIMER INTERRUPT HANDLER at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
@@ -134,11 +138,56 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  int64_t total_ticks = idle_ticks + user_ticks + kernel_ticks;
+  thread_wakeup( total_ticks );
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
+
+/**
+ * @brief thread_wakeup
+ * Check through the waiting threads if the waiting time has expired
+ * if so, the thread is unblocked
+ *
+ * @param tick number of ticks passed since the kernel initialization
+ */
+void
+thread_wakeup(int64_t current_tick)
+{
+  struct list_elem *e;
+
+  for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, dummy);
+      if( t->wakeup_tick <= current_tick)
+          thread_unblock(*t);
+      else
+          break;
+    }
+
+}
+
+
+/**
+ * @brief thread_sleep
+ * puts the current thread in the sleep thread list and changes it state
+ * to blocked.
+ * @param ticks number of ticks at wake up
+ */
+void
+thread_sleep(int64_t ticks)
+{
+  struct thread current_thread = thread_current();
+  current_thread.wakeup_tick = ticks;
+
+  list_insert_ordered(&sleep_list, &current_thread, list_less_function, dummy);
+
+  thread_block();
+}
+
 
 /* Prints thread statistics. */
 void
@@ -587,3 +636,17 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+
+static bool
+list_less_function(const struct list_elem *a, const struct list_elem *b,
+                   void *aux)
+{
+
+  struct thread *t1 = list_entry (a, struct thread, elem);
+  struct thread *t2 = list_entry (b, struct thread, elem);
+
+  return t1->wakeup_tick < t2->wakeup_tick;
+}
+
