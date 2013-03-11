@@ -161,7 +161,7 @@ thread_wakeup(int64_t current_tick)
   for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
        e = list_next (e))
     {
-      struct thread *t = list_entry (e, struct thread, dummy);
+      struct thread *t = list_entry (e, struct thread, tid);
       if( t->wakeup_tick <= current_tick)
           thread_unblock(*t);
       else
@@ -180,10 +180,10 @@ thread_wakeup(int64_t current_tick)
 void
 thread_sleep(int64_t ticks)
 {
-  struct thread current_thread = thread_current();
-  current_thread.wakeup_tick = ticks;
+  struct thread *current_thread = thread_current();
+  current_thread->wakeup_tick = ticks;
 
-  list_insert_ordered(&sleep_list, &current_thread, list_less_function, dummy);
+  list_insert_ordered(&sleep_list, current_thread, list_less_function, tid);
 
   thread_block();
 }
@@ -640,8 +640,7 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 
 static bool
-list_less_function(const struct list_elem *a, const struct list_elem *b,
-                   void *aux)
+list_less_function(const struct list_elem *a, const struct list_elem *b)
 {
 
   struct thread *t1 = list_entry (a, struct thread, elem);
