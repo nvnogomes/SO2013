@@ -77,7 +77,7 @@ static tid_t allocate_tid (void);
 
 static bool
 list_less_function(const struct list_elem *a,
-                   const struct list_elem *b, void *aux)
+                   const struct list_elem *b, void *aux UNUSED)
 {
 
   struct thread *t1 = list_entry (a, struct thread, elem);
@@ -177,7 +177,11 @@ thread_wakeup(int64_t current_tick)
     {
       struct thread *t = list_entry (e, struct thread, allelem);
       if( t->wakeup_tick <= current_tick)
+        {
+          list_remove(&t->elem);
+          t->wakeup_tick = 0;
           thread_unblock(t);
+        }
       else
           break;
     }
@@ -197,7 +201,7 @@ thread_sleep(int64_t ticks)
   struct thread *current_thread = thread_current();
   current_thread->wakeup_tick = ticks;
 
-  list_insert_ordered(&sleep_list, current_thread, list_less_function, ticks);
+  list_insert_ordered(&sleep_list, &current_thread->elem, list_less_function, NULL);
 
   thread_block();
 }
