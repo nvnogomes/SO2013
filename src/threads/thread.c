@@ -296,14 +296,19 @@ thread_block (void)
   schedule ();
 }
 
-/* Transitions a blocked thread T to the ready-to-run state.
+/** Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
 
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
-   update other data. */
+   update other data.
+
+   Because this is the method called upon thread creation, we will
+   check the thread priority and if it has a higher priority, the
+   running thread will be halted and the new one set to run.
+*/
 void
 thread_unblock (struct thread *t) 
 {
@@ -407,14 +412,20 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/** Sets the current thread's priority to NEW_PRIORITY.
+ *
+ * TODO
+ */
 void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
 }
 
-/* Returns the current thread's priority. */
+/** Returns the current thread's priority.
+ *
+ * TODO
+ */
 int
 thread_get_priority (void) 
 {
