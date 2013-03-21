@@ -8,11 +8,12 @@ line
 621 qemu -> qemu-system-i386
 622 comment the line with #
 
-
+add the pintos/src/utils to the path
+echo "PATH=$PATH:<path>/pintos/src/utils;" > $HOME/.bashrc
 
 COMPILING
 for i in threads userprog vm filesys; do make -C $i; done
 
-test installation of pintos
-/utils/pintos run alarm-multiple
+run tests
+pintos run alarm-multiple
 

@@ -400,19 +400,31 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /** Sets the current thread's priority to NEW_PRIORITY.
+ * a thread must yield the CPU if when lowering its priority
+ * it no longer has the highest priority
  *
  * TODO
  */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int new_priority)
 {
+  struct thread *current_thread = thread_current();
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
+
+
   thread_current ()->priority = new_priority;
+
+  if (current_thread->priority > new_priority)
+    {
+      thread_yield ();
+    }
+
+  intr_set_level (old_level);
 }
 
-/** Returns the current thread's priority.
- *
- * TODO
- */
+/** Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
