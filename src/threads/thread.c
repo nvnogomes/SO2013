@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -11,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -27,9 +29,6 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
-
-/* List of all the process that were given a time to sleep */
-static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -75,18 +74,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 
-static bool
-list_less_function(const struct list_elem *a,
-                   const struct list_elem *b, void *aux UNUSED)
-{
-
-  struct thread *t1 = list_entry (a, struct thread, elem);
-  struct thread *t2 = list_entry (b, struct thread, elem);
-
-  return t1->wakeup_tick < t2->wakeup_tick;
-}
-
-
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -109,7 +96,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -152,8 +138,8 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  int64_t total_ticks = idle_ticks + user_ticks + kernel_ticks;
-  thread_wakeup( total_ticks );
+  // unblock blocked threads
+  thread_foreach(&thread_wakeup, NULL);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -168,24 +154,22 @@ thread_tick (void)
  * @param tick number of ticks passed since the kernel initialization
  */
 void
-thread_wakeup(int64_t current_tick)
+thread_wakeup(struct thread *thread, void *aux UNUSED)
 {
-  struct list_elem *e;
+  enum intr_level old_level;
+  old_level = intr_disable ();
 
-  for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
-       e = list_next (e))
+  int64_t ticks = timer_ticks();
+  if( thread->status == THREAD_BLOCKED && thread->wakeup_tick > 0 )
     {
-      struct thread *t = list_entry (e, struct thread, allelem);
-      if( t->wakeup_tick <= current_tick)
+      if( ticks >= thread->wakeup_tick )
         {
-          list_remove(&t->elem);
-          t->wakeup_tick = 0;
-          thread_unblock(t);
+         thread->wakeup_tick = 0;
+         thread_unblock(thread);
         }
-      else
-          break;
     }
 
+  intr_set_level (old_level);
 }
 
 
@@ -198,12 +182,15 @@ thread_wakeup(int64_t current_tick)
 void
 thread_sleep(int64_t ticks)
 {
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
   struct thread *current_thread = thread_current();
   current_thread->wakeup_tick = ticks;
 
-  list_insert_ordered(&sleep_list, &current_thread->elem, list_less_function, NULL);
-
   thread_block();
+
+  intr_set_level (old_level);
 }
 
 
