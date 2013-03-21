@@ -29,25 +29,31 @@ JOIN
 >> member, global or static variable, ‘typedef’, or enumeration.
 >> Identify the purpose of each in 25 words or less.
 
+TIMER_SLEEP
+    Foi adicionado à estrutura thread um campo com a altura (ticks) para
+    a thread ser considerada de novo como "ready", wakeup_tick. Este campo vai
+    conter um valor dado pelo tempo actual mais o periodo de espera.
 
 
 
 ---- ALGORITHMS ----
-timer_sleep: alterações feitas têm o intuito de colocar a thread em modo
-bloqueado. Bloquear a thread e invocar o escalonador é feito com a chamada a
-função thread.thread_block().
+TIMER_SLEEP
 
-TODO
+Na thread que invoca o metodo timer_sleep(int64_t), é invocado o método
+thread_sleep que actualiza o campo da estrutura thread que guarda o tick no qual
+a thread deve voltar a ser considerada ready. Logo de seguida é bloqueada usando
+a função fornecida thread_block. A cada ciclo de relógio a rotina que trata o
+interrupt gerado pelo timer chama o metodo thread_tick, neste método vão ser
+percorridas todas as threads existentes. Cada uma vai ser verificado o seu
+estado e se precisam de ser acordadas, recolocando-as na lista ready se for o
+caso utilizando o metodo thread_unblock.
+
+
 
 
 
 
 ---- SYNCHRONIZATION ----
->>
->>
->>
->>
->>
 Consider parent thread P with child thread C. How do you ensure
 proper synchronization and avoid race conditions when P calls wait(C)
 before C exits? After C exits? How do you ensure that all resources
@@ -60,11 +66,9 @@ is no race on wait(C), because C waits for P’s permission before
 it frees itself.
 
 ---- RATIONALE ----
-
-
-
 >> Critique your design, pointing out advantages and disadvantages in
 >> your design choices.
-Era possível utilizar a função já fornecida thread_foreach, mas partindo do
-princio que as threads a chamarem o timer_sleep serão um grupo reduzido,
-cria-se uma nova estrutura de dados (sleep_list).
+Numa primeira versão foi tentado criar uma lista ordenada pelo tempo em que a
+thread iria acordar. Tento tido alguns problemas com esta versão foi utilizada
+a função thread_foreach, e a cada thread verificar se esta é uma thread
+adormecida e verificar se está na altura de a considerar ready.
