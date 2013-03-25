@@ -182,6 +182,12 @@ thread_wakeup(struct thread *thread, void *aux UNUSED)
 void
 thread_sleep(int64_t ticks)
 {
+
+  if( ticks < 0 )
+    {
+      return;
+    }
+
   enum intr_level old_level;
   old_level = intr_disable ();
 
