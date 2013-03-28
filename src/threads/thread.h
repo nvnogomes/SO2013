@@ -92,6 +92,8 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    struct list_elem wtelem;            /* List element waiting thread list */
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -125,7 +127,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_block (void);
 void thread_unblock (struct thread *);
 
-void thread_wakeup (struct thread *, void *);
+void thread_wakeup (void);
 void thread_sleep (int64_t);
 
 struct thread *thread_current (void);

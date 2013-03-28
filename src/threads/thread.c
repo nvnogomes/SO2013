@@ -30,6 +30,11 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+
+/* List of all process waiting to be waked up */
+static struct list wait_list;
+
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -73,6 +78,40 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool wakeup_order (const struct list_elem *a,
+                  const struct list_elem *b,void *aux);
+bool priority_order (const struct list_elem *a,
+                    const struct list_elem *b,void *aux);
+
+
+
+bool wakeup_order (const struct list_elem *a,
+                  const struct list_elem *b,void *aux UNUSED)
+{
+  struct thread *thread_1 = list_entry (a, struct thread, wtelem);
+  struct thread *thread_2 = list_entry (b, struct thread, wtelem);
+
+  if( thread_1->priority > thread_2->priority )
+    return true;
+  else
+    {
+      if( thread_1->priority == thread_2->priority && thread_1->wakeup_tick < thread_2->wakeup_tick)
+        return true;
+      else
+        return false;
+    }
+}
+
+
+bool priority_order (const struct list_elem *a,
+                    const struct list_elem *b,void *aux UNUSED)
+{
+  struct thread *thread_1 = list_entry (a, struct thread, elem);
+  struct thread *thread_2 = list_entry (b, struct thread, elem);
+
+  return thread_1->priority > thread_2->priority;
+}
+
 
 
 /* Initializes the threading system by transforming the code
@@ -96,6 +135,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&wait_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -139,7 +179,7 @@ thread_tick (void)
     kernel_ticks++;
 
   // unblock blocked threads
-  thread_foreach(&thread_wakeup, NULL);
+  thread_wakeup();
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -154,19 +194,25 @@ thread_tick (void)
  * @param tick number of ticks passed since the kernel initialization
  */
 void
-thread_wakeup(struct thread *thread, void *aux UNUSED)
+thread_wakeup(void)
 {
   enum intr_level old_level;
   old_level = intr_disable ();
 
-  int64_t ticks = timer_ticks();
-  if( thread->status == THREAD_BLOCKED && thread->wakeup_tick > 0 )
+
+  struct thread *t;
+  struct list_elem *elem = list_begin (&wait_list);
+  for (; elem != list_end (&wait_list); elem = list_next (elem))
     {
-      if( ticks >= thread->wakeup_tick )
-        {
-         thread->wakeup_tick = 0;
-         thread_unblock(thread);
-        }
+      t = list_entry (elem, struct thread, wtelem);
+
+      if( t->wakeup_tick > timer_ticks() )
+          break;
+
+      //printf("Thread: %s with %lld P(%i)\n", t->name, t->wakeup_tick, t->priority);
+
+      thread_unblock(t);
+      list_remove(elem);
     }
 
   intr_set_level (old_level);
@@ -182,17 +228,18 @@ thread_wakeup(struct thread *thread, void *aux UNUSED)
 void
 thread_sleep(int64_t ticks)
 {
-
+  // should not happen
   if( ticks < 0 )
-    {
       return;
-    }
 
   enum intr_level old_level;
   old_level = intr_disable ();
 
   struct thread *current_thread = thread_current();
   current_thread->wakeup_tick = ticks;
+  list_insert_ordered(&wait_list, &current_thread->wtelem, wakeup_order, NULL);
+
+  //thread_print_stats();
 
   thread_block();
 
@@ -204,8 +251,23 @@ thread_sleep(int64_t ticks)
 void
 thread_print_stats (void) 
 {
-  printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
+  /*
+   printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
           idle_ticks, kernel_ticks, user_ticks);
+          */
+  printf("Added: %s with %lld | List Size: %i | CT %lld\n", thread_current()->name,thread_current()->wakeup_tick, list_size(&wait_list), timer_ticks());
+
+  printf("Queue (%i)\n", list_size(&wait_list));
+  struct thread *t;
+  struct list_elem *elem = list_begin (&wait_list);
+  for (; elem != list_end (&wait_list); elem = list_next (elem))
+    {
+      t = list_entry (elem, struct thread, wtelem);
+      printf("Thread: %s with %lld P(%i)\n", t->name, t->wakeup_tick, t->priority);
+    }
+  printf("\n");
+
+
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -311,7 +373,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, priority_order, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -382,7 +444,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, priority_order,NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -553,7 +615,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  list_push_back (&all_list, &t->allelem);
+  list_insert_ordered(&all_list, &t->allelem, priority_order, NULL);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
