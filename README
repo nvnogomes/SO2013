@@ -3,10 +3,10 @@ follow steps
 3,4 (5)
 
 replace in file "pintos"
-line
-103 bochs -> qemu
-621 qemu -> qemu-system-i386
-622 comment the line with #
+Line    Substitution
+103     bochs -> qemu
+621     qemu -> qemu-system-i386
+622     comment the line with #
 
 add the pintos/src/utils to the path
 echo "PATH=$PATH:<path>/pintos/src/utils;" > $HOME/.bashrc
@@ -14,6 +14,9 @@ echo "PATH=$PATH:<path>/pintos/src/utils;" > $HOME/.bashrc
 COMPILING
 for i in threads userprog vm filesys; do make -C $i; done
 
-run tests
-pintos run alarm-multiple
+
+TESTS
+pintos run <test>
+
+<project>/build/make check SIMULATOR=--qemu
 

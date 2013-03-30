@@ -1,74 +1,155 @@
-+----------------------+
-| SISTEMAS DE OPERAÇÃO |
-|                      |
-|  PROJECTO O1         |
-|  DESIGN DOCUMENT     |
-+----------------------+
+
+
+
+
+            +--------------------+
+            |     OS 2012-13     |
+            | PROJECT 1: THREADS |
+            |   DESIGN DOCUMENT  |
+            +--------------------+
 
 ---- GROUP ----
-Nuno Gomes <p111082@campus.fct.unl.pt>
-Serhiy Moskovchuk <??@campus.fct.unl.pt>
+
+36720 Nuno Gomes <p111082@campus.fct.unl.pt>
+41453 Serhiy Moskovchuk <s.moskovchuk@campus.fct.unl.pt>
+
 
 
 ---- PRELIMINARIES ----
-Appendix D: Project Documentation
-100
->> If you have any preliminary comments on your submission, notes for
->> the TAs, or extra credit, please give them here.
-(This is a sample design document.)
->> Please cite any offline or online sources you consulted while
->> preparing your submission, other than the Pintos documentation,
->> course text, and lecture notes.
-None.
+
+Feijões virtuais
+Nuno 	15
+Serhiy 	5
+
+Primeira entrega do primeiro trabalho. Vamos continuar a trabalhar neste
+trabalho para acabar a segunda parte, sem que prejudique o inicio do
+segundo projecto.
+
+Testes no qual o nosso trabalho passa até ao momento:
+    pass tests/threads/alarm-single
+    pass tests/threads/alarm-multiple
+    pass tests/threads/alarm-simultaneous
+    pass tests/threads/alarm-priority
+    pass tests/threads/alarm-zero
+    pass tests/threads/alarm-negative
 
 
-JOIN
-====
+
+
+                 ALARM CLOCK
+                 ===========
+
 ---- DATA STRUCTURES ----
->> Copy here the declaration of each new or changed ‘struct’ or ‘struct’
->> member, global or static variable, ‘typedef’, or enumeration.
->> Identify the purpose of each in 25 words or less.
 
-TIMER_SLEEP
-    Foi adicionado à estrutura thread um campo com a altura (ticks) para
-    a thread ser considerada de novo como "ready", wakeup_tick. Este campo vai
-    conter um valor dado pelo tempo actual mais o periodo de espera.
-
+>> A1
+Nenhuma estrutura de dados criada para a resolução desta fase.
+Apenas campos na estrutura thread.
 
 
 ---- ALGORITHMS ----
-TIMER_SLEEP
 
-Na thread que invoca o metodo timer_sleep(int64_t), é invocado o método
-thread_sleep que actualiza o campo da estrutura thread que guarda o tick no qual
-a thread deve voltar a ser considerada ready. Logo de seguida é bloqueada usando
-a função fornecida thread_block. A cada ciclo de relógio a rotina que trata o
-interrupt gerado pelo timer chama o metodo thread_tick, neste método vão ser
-percorridas todas as threads existentes. Cada uma vai ser verificado o seu
-estado e se precisam de ser acordadas, recolocando-as na lista ready se for o
-caso utilizando o metodo thread_unblock.
+>> A2
+Quando é feita uma chamada a função timer_sleep() é calculado o tick no qual
+a thread pode passar ao estado ready, este valor é passado como argumento
+à função thread_sleep. Nesta função é afectado o campo da estrutura thread
+que regista o tempo de transição do estado, e a thread é passada ao estado
+bloqueado.
+A quando do interrupt do timer é invocada a função thread_tick, esta função
+além da sua função anteriormente definida, agora invoca um ciclo que passa
+por todas as threads existentes verificando se estas se encontram bloqueadas
+pela invocação do timer_sleep. Se é o caso, é verificado se já é altura desta
+voltar ao estado ready, se for é colocado a zero o tick para acordar e
+desbloqueada por invocação do thread_unblock.
 
 
-
-
+>> A3
+A nossa implementação actual não minimiza o tempo no handler.
 
 
 ---- SYNCHRONIZATION ----
-Consider parent thread P with child thread C. How do you ensure
-proper synchronization and avoid race conditions when P calls wait(C)
-before C exits? After C exits? How do you ensure that all resources
-are freed in each case? How about when P terminates without waiting,
-before C exits? After C exits? Are there any special cases?
-C waits in thread_exit() for P to die before it finishes its own
-exit, using the can_die semaphore "down"ed by C and "up"ed by P as
-it exits. Regardless of whether whether C has terminated, there
-is no race on wait(C), because C waits for P’s permission before
-it frees itself.
+
+>> A4
+
+>> A5
+São interrompidos os interrupts durante o processamento da função.
+
 
 ---- RATIONALE ----
->> Critique your design, pointing out advantages and disadvantages in
->> your design choices.
-Numa primeira versão foi tentado criar uma lista ordenada pelo tempo em que a
-thread iria acordar. Tento tido alguns problemas com esta versão foi utilizada
-a função thread_foreach, e a cada thread verificar se esta é uma thread
-adormecida e verificar se está na altura de a considerar ready.
+
+>> A6
+Este design tem a vantagem de utilizar funções já definidas pelo pintOS.
+Foi considerada a criação de uma lista ordenada pelo tempo de wake up das
+threads, tem a vantagem de realizar ciclos mais pequenos na verificação
+das threads a acordar, apesar de adicionar complexidade e duplicação de
+informação.
+
+
+             PRIORITY SCHEDULING
+             ===================
+
+Não resolvido ainda.
+
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+>> B2: Explain the data structure used to track priority donation.
+>> Preferably, submit a PDF file (but it can also be a PNG ou JPG)
+
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+
+
+               SURVEY QUESTIONS
+               ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.
+
+>> In your opinion, was this assignment, or any one of the two problems
+>> in it, too easy or too hard?  Can you please give me an estimation of
+>> the time it took your group (in hours) to solve this assignment?
+(Consider "group" work hours and not individual work hours)
+A primeira fase é simples, a segunda, embora seja fácil entender os conceitos
+e parte teorica, torna-se complicado no código.
+Estimativa ~20h
+
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+Desde logo fica claro que um SO não é um programa e como ele funciona com
+base nos interrupts.
+
+>> Is there some particular fact or hint we should give students in
+>> future editions of this course to help them solve the problems?
+Talvez dar exemplos do funcionamento pintOS das várias áreas de estudo
+na componênte teórica.
+
+>> Any other comments?

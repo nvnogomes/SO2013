@@ -251,10 +251,10 @@ thread_sleep(int64_t ticks)
 void
 thread_print_stats (void) 
 {
-  /*
+
    printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
           idle_ticks, kernel_ticks, user_ticks);
-          */
+
   printf("Added: %s with %lld | List Size: %i | CT %lld\n", thread_current()->name,thread_current()->wakeup_tick, list_size(&wait_list), timer_ticks());
 
   printf("Queue (%i)\n", list_size(&wait_list));
@@ -470,26 +470,15 @@ thread_foreach (thread_action_func *func, void *aux)
 /** Sets the current thread's priority to NEW_PRIORITY.
  * a thread must yield the CPU if when lowering its priority
  * it no longer has the highest priority
- *
- * TODO
  */
 void
 thread_set_priority (int new_priority)
 {
-  struct thread *current_thread = thread_current();
-  enum intr_level old_level;
+  struct thread *t = thread_current();
 
-  old_level = intr_disable ();
-
-
-  thread_current ()->priority = new_priority;
-
-  if (current_thread->priority > new_priority)
-    {
-      thread_yield ();
-    }
-
-  intr_set_level (old_level);
+  printf("Thread %s P_%i\n", t->name, t->priority);
+  t->priority = new_priority;
+  printf("Thread %s P_%i\n\n", t->name, t->priority);
 }
 
 /** Returns the current thread's priority. */
