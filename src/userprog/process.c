@@ -38,12 +38,19 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Create a new thread to execute FILE_NAME. */
+  /**
+   * Create a new thread to execute FILE_NAME.
+   * thread create calls start_process function
+   */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
 }
+
+
+
+
 
 /* A thread function that loads a user process and starts it
    running. */
@@ -59,11 +66,64 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
 
+  /**
+   * file_name string split
+   */
+  int argc = 0;
+  char **argv;
+  int i,len = 0;
+
+  char *token, *last;
+  for(token = strtok_r(file_name, " ", &last) ;
+                  token != NULL; token = strtok_r(NULL, " ", &last ) )
+  {
+      argv[argc] = token;
+      argc++;
+  }
+
+  // load program
+  success = load (argv[0], &if_.eip, &if_.esp);
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+
+  if (success)
+    {
+    /**
+                //push the program arguments on the stack first, order from top to bottom
+                for(i=argc-1;i>=0;i--) {
+                      len = strnlen(argv[i],128);
+                      if_.esp = if_.esp - (len+1);
+                      strlcpy(if_.esp,argv[i],128);
+                      argv[i] = if_.esp;
+                }
+                int diff;
+                //push the stack pointer down to a multiple of 4
+                 if( ( diff = *(int *)if_.esp % 4) != 0) if_.esp-= diff;
+
+                //write 0 in the highest argv spot, just bump up the esp by char *
+                if_.esp = if_.esp - (4);
+                *(int *)if_.esp = (int) 0;
+
+                //push on the argument pointer
+                for(i=argc-1;i>=0;i--) {
+                      if_.esp = if_.esp - (sizeof(argv[i]));
+                      *(char **)if_.esp = argv[i];
+                }
+
+                //push on the argv ** pointer
+                if_.esp = if_.esp - 4;
+                *(char ***)if_.esp = if_.esp + 4;
+
+                //push on the argc int
+                if_.esp = if_.esp - sizeof(int);
+                *(int *)if_.esp = argc;
+
+                //push return address on the stack
+                if_.esp = if_.esp - sizeof(void *);
+                *(int *)if_.esp = (int) 0;
+                **/
+    }
     thread_exit ();
 
   /* Start the user process by simulating a return from an
@@ -75,6 +135,8 @@ start_process (void *file_name_)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
+
+
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -88,7 +150,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  while(1)
+    {
+      // project assignment 3.2
+    }
 }
 
 /* Free the current process's resources. */
@@ -437,7 +502,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;  // step 3.2
       else
         palloc_free_page (kpage);
     }
