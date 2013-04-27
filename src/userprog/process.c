@@ -88,41 +88,7 @@ start_process (void *file_name_)
 
   if (success)
     {
-
-      // just testing this solution
-      int i,j;
-      char **argv_addr = palloc_get_page(0);
-
-      for(i = argc - 1; i >= 0; i--)
-        {
-          for(j = strlen(argv[i]); j > 0; j-- )
-            {
-              if_.esp -= 1;
-              *(char *) if_.esp = (argv[i][j]);
-            }
-          argv_addr[i] = (char *) if_.esp;
-        }
-
-      if_.esp -= (if_.esp - if_.esp&  4);
-      if_.esp -= 4;
-      *(char **) if_.esp = NULL;
-
-      for(i = argc - 1; i >= 0; i--)
-        {
-          if_.esp -= 4;
-          *(char **) if_.esp = argv_addr[i];
-        }
-
-      char **addr = (char **) if_.esp;
-      if_.esp -= 4;
-      *(char ***) if_.esp = addr;
-      if_.esp -= 4;
-      *(int *) if_.esp = argc;
-      if_.esp -= 4;
-      *(void **) if_.esp = 0;
-
-      palloc_free_page(argv_addr);
-
+      // TODO
     }
   else
     {
@@ -152,7 +118,7 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
   while(1)
     {
