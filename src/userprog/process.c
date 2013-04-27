@@ -72,7 +72,6 @@ start_process (void *file_name_)
    */
   int argc = 0;
   char **argv;
-  int i,len = 0;
 
   char *token, *last;
   for(token = strtok_r(file_name, " ", &last) ;
@@ -89,42 +88,47 @@ start_process (void *file_name_)
 
   if (success)
     {
-    /**
-                //push the program arguments on the stack first, order from top to bottom
-                for(i=argc-1;i>=0;i--) {
-                      len = strnlen(argv[i],128);
-                      if_.esp = if_.esp - (len+1);
-                      strlcpy(if_.esp,argv[i],128);
-                      argv[i] = if_.esp;
-                }
-                int diff;
-                //push the stack pointer down to a multiple of 4
-                 if( ( diff = *(int *)if_.esp % 4) != 0) if_.esp-= diff;
 
-                //write 0 in the highest argv spot, just bump up the esp by char *
-                if_.esp = if_.esp - (4);
-                *(int *)if_.esp = (int) 0;
+      // just testing this solution
+      int i,j;
+      char **argv_addr = palloc_get_page(0);
 
-                //push on the argument pointer
-                for(i=argc-1;i>=0;i--) {
-                      if_.esp = if_.esp - (sizeof(argv[i]));
-                      *(char **)if_.esp = argv[i];
-                }
+      for(i = argc - 1; i >= 0; i--)
+        {
+          for(j = strlen(argv[i]); j > 0; j-- )
+            {
+              if_.esp -= 1;
+              *(char *) if_.esp = (argv[i][j]);
+            }
+          argv_addr[i] = (char *) if_.esp;
+        }
 
-                //push on the argv ** pointer
-                if_.esp = if_.esp - 4;
-                *(char ***)if_.esp = if_.esp + 4;
+      if_.esp -= (if_.esp - if_.esp&  4);
+      if_.esp -= 4;
+      *(char **) if_.esp = NULL;
 
-                //push on the argc int
-                if_.esp = if_.esp - sizeof(int);
-                *(int *)if_.esp = argc;
+      for(i = argc - 1; i >= 0; i--)
+        {
+          if_.esp -= 4;
+          *(char **) if_.esp = argv_addr[i];
+        }
 
-                //push return address on the stack
-                if_.esp = if_.esp - sizeof(void *);
-                *(int *)if_.esp = (int) 0;
-                **/
+      char **addr = (char **) if_.esp;
+      if_.esp -= 4;
+      *(char ***) if_.esp = addr;
+      if_.esp -= 4;
+      *(int *) if_.esp = argc;
+      if_.esp -= 4;
+      *(void **) if_.esp = 0;
+
+      palloc_free_page(argv_addr);
+
     }
-    thread_exit ();
+  else
+    {
+      thread_exit ();
+    }
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

@@ -7,10 +7,22 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "filesys/inode.h"
-#include "lib/user/syscall.h"
 
 static void syscall_handler (struct intr_frame *);
 
+/**
+ * add something to wait list
+ */
+
+/**
+ * add something file descriptors
+ */
+
+
+
+/**
+ * @brief syscall_init
+ */
 void
 syscall_init (void) 
 {
@@ -20,26 +32,71 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  thread_exit ();
+  int ret;
+  int *op = f->esp;
+
+  switch(op)
+    {
+    case SYS_HALT:                   /* Halt the operating system. */
+      ret = halt();
+      break;
+    case SYS_EXIT:                   /* Terminate this process. */
+      ret = exit(*p+1);
+      break;
+    case SYS_EXEC:                   /* Start another process. */
+      ret = exec(*p+1);
+      break;
+    case SYS_WAIT:                   /* Wait for a child process to die. */
+      ret = wait(*p+1);
+      break;
+    case SYS_CREATE:                 /* Create a file. */
+      ret = create(*p+1,*p+2);
+      break;
+    case SYS_REMOVE:                 /* Delete a file. */
+      ret = remove(*p+1);
+      break;
+    case SYS_OPEN:                   /* Open a file. */
+      ret = open(*p+1);
+      break;
+    case SYS_FILESIZE:               /* Obtain a file's size. */
+      ret = filesize(*p+1);
+      break;
+    case SYS_READ:                   /* Read from a file. */
+      ret = read(*p+1,*p+2,*p+3);
+      break;
+    case SYS_WRITE:                  /* Write to a file. */
+      ret = write(*p+1,*p+2,*p+3);
+      break;
+    case SYS_SEEK:                   /* Change position in a file. */
+      ret = seek(*p+1,*p+2);
+      break;
+    case SYS_TELL:                   /* Report current position in a file. */
+      ret = tell(*p+1);
+      break;
+    case SYS_CLOSE:                  /* Close a file. */
+      ret = close(*p+1);
+      break;
+    }
+
+  f->eax = ret;
+
 }
 
-
-void
+int
 halt (void)
 {
   shutdown_power_off();
 }
 
 
-void
+int
 exit (int status)
 {
 
 }
 
 
-pid_t
+int
 exec(const char *file)
 {
 
@@ -57,7 +114,7 @@ wait (pid_t pid)
  * open it: opening the new file is a separate operation which would require
  * a open system call.
  */
-bool
+int
 create (const char *file, unsigned initial_size)
 {
   return filesys_create(file, initial_size);
@@ -68,7 +125,7 @@ create (const char *file, unsigned initial_size)
  * A file may be removed regardless of whether it is open or closed, and
  * removing an open file does not close it.
  */
-bool
+int
 remove (const char *file)
 {
   struct file *fd = filesys_open(file);
@@ -110,19 +167,19 @@ write (int fd, const void *buffer, unsigned length)
 
 }
 
-void
+int
 seek (int fd, unsigned position)
 {
 
 }
 
-unsigned
+int
 tell (int fd)
 {
 
 }
 
-void
+int
 close (int fd)
 {
 
