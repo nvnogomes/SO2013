@@ -4,6 +4,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "threads/vaddr.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "filesys/inode.h"
@@ -24,6 +25,9 @@ static int wait(int);
 static int read(int, void*,unsigned);
 
 static int get_next_fd();
+static struct fdelem* get_of_fd(int);
+static struct fdelem* get_tf_fd (int);
+
 
 /**
  * add something to wait list
@@ -90,7 +94,7 @@ syscall_handler (struct intr_frame *f)
       ret = exec(*(p+1));
       break;
     case SYS_WAIT:                   /* Wait for a child process to die. */
-      ret = wait(*(p+1);
+      ret = wait(*(p+1));
       break;
     case SYS_CREATE:                 /* Create a file. */
       ret = create(*(p+1),*(p+2));
@@ -140,16 +144,14 @@ exit (int status)
 {
   int ret = -1;
   struct thread *t;
-  struct fdelem *fd
+  struct fdelem *fd;
   struct list_elem *l;
-      ;
+
   t = thread_current ();
   // close files of the thread
   while (!list_empty (&t->files))
       {
         l = list_begin (&t->files);
-
-        list_remove (&of_files->elem);
       }
 
   t->status = status;
@@ -215,15 +217,15 @@ open (const char *file)
     }
   else
     {
-      struct fdelem fde;
-      fde.fd = get_next_fd();
-      fde.file = file;
-      struct thread t = thread_current();
+      struct fdelem *fde;
+      fde->fd = get_next_fd();
+      fde->file = file;
+      struct thread *t = thread_current();
 
       // add current file to open files and thread files
-      list_push_back(&t.files, fde.thread_elem);
-      list_push_back(&open_files, fde.of_elem);
-      return fde.fd;
+      list_push_back(&t->files, &fde->thread_elem);
+//      list_push_back(&open_files, fde.of_elem);
+      return &fde->fd;
     }
 }
 
@@ -374,10 +376,10 @@ static int
 close (int fd)
 {
   int ret = -1;
-  struct fdelem *fd;
+  struct fdelem *fde = get_tf_fd(fd);
 
-  list_remove (&fd->elem);
-  list_remove (&fd->thread_elem);
+//  list_remove (fde->of_elem);
+  list_remove (&fde->thread_elem);
 
   return ret;
 }
@@ -427,6 +429,7 @@ static struct fdelem*
 get_tf_fd (int fd)
 {
   struct list_elem *e;
+  struct thread *t = thread_current();
 
   for (e = list_begin (&t->files); e != list_end (&t->files);
        e = list_next (e))

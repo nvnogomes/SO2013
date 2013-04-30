@@ -1,12 +1,15 @@
 SETUP
-follow steps
-3,4 (5)
 
-replace in file "pintos"
+to work with qemu replace in file "pintos":
 Line    Substitution
-103     bochs -> qemu
-621     qemu -> qemu-system-i386
-622     comment the line with #
+
+sub parse_command_line:
+$sim variable ->     bochs -> qemu
+
+In the sub run_qemu function:
+	my (@cmd) = ('qemu-system-i386');
+	#    push (@cmd, '-no-kqemu');
+
 
 add the pintos/src/utils to the path
 echo "PATH=$PATH:<path>/pintos/src/utils;" > $HOME/.bashrc
