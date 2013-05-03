@@ -25,7 +25,7 @@ void exit (int status) NO_RETURN;
 pid_t exec (const char *file);
 int wait (pid_t);
 bool create (const char *file, unsigned initial_size);
-bool remove (const char *file);
+bool sysc_remove (const char *file);
 int open (const char *file);
 int filesize (int fd);
 int read (int fd, void *buffer, unsigned length);

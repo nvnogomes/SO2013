@@ -98,7 +98,7 @@ struct thread
     struct list_elem elem;              /* List element. */
 
 
-    struct list_elem files;             /* openfiles -> userprog */
+    struct list files;             /* openfiles -> userprog */
 
   #ifdef USERPROG
     /* Owned by userprog/process.c. */

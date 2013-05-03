@@ -37,7 +37,7 @@ test_main (void)
       snprintf (contents, sizeof contents, "contents %d\n", i);
       if (write (fd, contents, strlen (contents)) != (int) strlen (contents)) 
         {
-          CHECK (remove (file_name), "remove \"%s\"", file_name);
+          CHECK (sysc_remove (file_name), "remove \"%s\"", file_name);
           close (fd);
           break;
         }
@@ -47,7 +47,7 @@ test_main (void)
       snprintf (dir_name, sizeof dir_name, "dir%d", i);
       if (!mkdir (dir_name)) 
         {
-          CHECK (remove (file_name), "remove \"%s\"", file_name);
+          CHECK (sysc_remove (file_name), "remove \"%s\"", file_name);
           break; 
         }
 
@@ -78,8 +78,8 @@ test_main (void)
       snprintf (file_name, sizeof file_name, "file%d", i);
       snprintf (dir_name, sizeof dir_name, "dir%d", i);
       CHECK (chdir (".."), "chdir \"..\"");
-      CHECK (remove (dir_name), "remove \"%s\"", dir_name);
-      CHECK (remove (file_name), "remove \"%s\"", file_name);
+      CHECK (sysc_remove (dir_name), "remove \"%s\"", dir_name);
+      CHECK (sysc_remove (file_name), "remove \"%s\"", file_name);
     }
   quiet = false;
 }

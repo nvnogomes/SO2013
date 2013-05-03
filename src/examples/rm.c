@@ -12,7 +12,7 @@ main (int argc, char *argv[])
   int i;
   
   for (i = 1; i < argc; i++)
-    if (!remove (argv[i])) 
+    if (!sysc_remove (argv[i])) 
       {
         printf ("%s: remove failed\n", argv[i]);
         success = false; 

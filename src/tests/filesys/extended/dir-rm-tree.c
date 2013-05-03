@@ -58,5 +58,5 @@ do_remove (const char *format, ...)
   vsnprintf (name, sizeof name, format, args);
   va_end (args);
 
-  CHECK (remove (name), "remove \"%s\"", name);
+  CHECK (sysc_remove (name), "remove \"%s\"", name);
 }

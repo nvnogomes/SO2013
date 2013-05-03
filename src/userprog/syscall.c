@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -9,23 +10,35 @@
 #include "filesys/file.h"
 #include "filesys/inode.h"
 
-static void syscall_handler (struct intr_frame *);
-static int exec(const char*);
-static int exit(int);
-static int create(const char *, unsigned);
-static int open(const char*);
-static int halt();
-static int close(int);
-static int filesize(int);
-static int write(int,const void *, unsigned);
-static int seek(int, unsigned);
-static int remove(const char *);
-static int tell(int);
-static int wait(int);
-static int read(int, void*,unsigned);
+// process_start(...)
+#include "process.h"
 
-static int get_next_fd();
-static struct fdelem* get_of_fd(int);
+// input_getc
+#include "devices/input.h"
+
+#define STDIN_FD  0   // standard input
+#define STDOUT_FD 1   // standard output
+
+#define SUCCESS 0
+#define ERROR   1
+
+
+static void syscall_handler (struct intr_frame *);
+static int sysc_exec(const char*);
+static int sysc_exit(int);
+static int sysc_create(const char *, unsigned);
+static int sysc_open(const char*);
+static int sysc_halt(void);
+static int sysc_close(int);
+static int sysc_filesize(int);
+static int sysc_write(int,const void *, unsigned);
+static int sysc_seek(int, unsigned);
+static int sysc_remove(const char *);
+static int sysc_tell(int);
+static int sysc_wait(int);
+static int sysc_read(int, void*,unsigned);
+
+static int get_next_fd(void);
 static struct fdelem* get_tf_fd (int);
 
 
@@ -37,8 +50,7 @@ static struct list pid_wait;
 
 /**
  * add something file descriptors
- * fd 0 (STDIN_FILENO) is standard input,
- * fd 1 (STDOUT_FILENO) is standard output.
+ * starting in 2
  */
 static int next_fd;
 
@@ -53,8 +65,6 @@ struct fdelem {
   struct list_elem of_elem;
 };
 
-static struct list open_files;
-
 
 /**
  * @brief syscall_init
@@ -65,63 +75,60 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 
   next_fd = 2;
-  list_init(&open_files);
   list_init(&pid_wait);
 }
 
 static void
 syscall_handler (struct intr_frame *f)
 {
-  int ret;
-  int *p = f->esp;
-
-  if( !(is_user_vaddr(*(p+1)) && is_user_vaddr(*(p+2)) && is_user_vaddr(*(p+3))) )
+  if( is_user_vaddr(f) == false  )
     {
-      exit(-1);
+      sysc_exit(1);
     }
 
-
+  int ret = 1;
+  int *p = f->esp;
 
   switch(*p)
     {
     case SYS_HALT:                   /* Halt the operating system. */
-      ret = halt();
+      ret = sysc_halt();
       break;
     case SYS_EXIT:                   /* Terminate this process. */
-      ret = exit(*(p+1));
+      ret = sysc_exit((int)*(p+1));
       break;
     case SYS_EXEC:                   /* Start another process. */
-      ret = exec(*(p+1));
+      ret = sysc_exec((const char*)*(p+1));
       break;
     case SYS_WAIT:                   /* Wait for a child process to die. */
-      ret = wait(*(p+1));
+      ret = sysc_wait((int)*(p+1));
       break;
     case SYS_CREATE:                 /* Create a file. */
-      ret = create(*(p+1),*(p+2));
+      ret = sysc_create((const char*)*(p+1),(unsigned)*(p+2));
       break;
     case SYS_REMOVE:                 /* Delete a file. */
-      ret = remove(*(p+1));
+      ret = sysc_remove((const char*)*(p+1));
       break;
     case SYS_OPEN:                   /* Open a file. */
-      ret = open(*(p+1));
+      ret = sysc_open((const char*)*(p+1));
       break;
     case SYS_FILESIZE:               /* Obtain a file's size. */
-      ret = filesize(*(p+1));
+      ret = sysc_filesize((int)*(p+1));
       break;
     case SYS_READ:                   /* Read from a file. */
-      ret = read(*(p+1),*(p+2),*(p+3));
+      ret = sysc_read((int)*(p+1),(void*)*(p+2),(unsigned)*(p+3));
       break;
     case SYS_WRITE:                  /* Write to a file. */
-      ret = write(*(p+1),*(p+2),*(p+3));
+      ret = sysc_write((int)*(p+1),(void*)*(p+2),(unsigned)*(p+3));
       break;
     case SYS_SEEK:                   /* Change position in a file. */
-      ret = seek(*(p+1),*(p+2));
+      ret = sysc_seek((int)*(p+1),(unsigned)*(p+2));
       break;
     case SYS_TELL:                   /* Report current position in a file. */
-      ret = tell(*(p+1));
+      ret = sysc_tell((int)*(p+1));
       break;
     case SYS_CLOSE:                  /* Close a file. */
-      ret = close(*(p+1));
+      ret = sysc_close((int)*(p+1));
       break;
     }
 
@@ -131,46 +138,51 @@ syscall_handler (struct intr_frame *f)
 
 
 static int
-halt (void)
+sysc_halt (void)
 {
   shutdown_power_off();
 
-  return 0;
+  return SUCCESS;
 }
 
 
 static int
-exit (int status)
+sysc_exit (int status)
 {
-  int ret = -1;
   struct thread *t;
-  struct fdelem *fd;
-  struct list_elem *l;
+  struct list_elem *e;
 
-  t = thread_current ();
+  t = thread_current();
   // close files of the thread
-  while (!list_empty (&t->files))
-      {
-        l = list_begin (&t->files);
-      }
+  for (e = list_begin (&t->files); e != list_end (&t->files);
+       e = list_next (e))
+    {
+      struct fdelem *fde = list_entry (e, struct fdelem, thread_elem);
+      sysc_close(fde->fd);
+    }
+
 
   t->status = status;
   thread_exit();
 
-  return ret;
+  return SUCCESS;
 }
 
 
 static int
-exec(const char *file)
+sysc_exec(const char *file)
 {
-  int ret = -1;
-  ret = process_execute(file);
-  return ret;
+
+  if( is_user_vaddr(file)  )
+    {
+      return process_execute(file);
+    }
+
+  return ERROR;
 }
 
 static int
-wait (int pid)
+sysc_wait (int pid)
 {
   return process_wait(pid);
 }
@@ -182,9 +194,15 @@ wait (int pid)
  * a open system call.
  */
 static int
-create (const char *file, unsigned initial_size)
+sysc_create (const char *file, unsigned initial_size)
 {
-  return filesys_create(file, initial_size) ? 0 : -1;
+
+  if( is_user_vaddr(file) )
+    {
+      return filesys_create(file, initial_size) ? 0 : 1;
+    }
+
+  return ERROR;
 }
 
 /**
@@ -193,14 +211,20 @@ create (const char *file, unsigned initial_size)
  * removing an open file does not close it.
  */
 static int
-remove (const char *file)
+sysc_remove (const char *file)
 {
-  struct file *fd = filesys_open(file);
-  struct inode *fi = file_get_inode(fd);
+  if( is_user_vaddr(file) )
+    {
+      struct file *fd = filesys_open(file);
+      struct inode *fi = file_get_inode(fd);
 
-  // file will be deleted after last reader closes the file
-  inode_remove(fi);
-  return filesys_remove(file);
+      // file will be deleted after last reader closes the file
+      inode_remove(fi);
+      return filesys_remove(file);
+
+    }
+
+  return ERROR;
 }
 
 /**
@@ -208,25 +232,27 @@ remove (const char *file)
  * called a "file descriptor" (fd), or -1 if the file could not be opened.
  */
 static int
-open (const char *file)
+sysc_open (const char *file)
 {
-  struct file *fd = filesys_open(file);
-  if( fd == NULL )
+  int ret = -ERROR;
+  if( is_user_vaddr(file) )
     {
-      return -1;
-    }
-  else
-    {
-      struct fdelem *fde;
-      fde->fd = get_next_fd();
-      fde->file = file;
-      struct thread *t = thread_current();
+      struct file *fd = filesys_open(file);
+      if( fd != NULL )
+        {
+          struct fdelem *fde;
+          fde = (struct fdelem *)malloc (sizeof (struct fdelem));
+          fde->fd = get_next_fd();
+          fde->file = fd;
+          struct thread *t = thread_current();
 
-      // add current file to open files and thread files
-      list_push_back(&t->files, &fde->thread_elem);
-//      list_push_back(&open_files, fde.of_elem);
-      return &fde->fd;
+          // add current file to open files and thread files
+          list_push_back(&t->files, &fde->thread_elem);
+          ret = (int)&fde->fd;
+        }
     }
+
+  return ret;
 }
 
 /**
@@ -235,18 +261,16 @@ open (const char *file)
  * @return the size, in bytes, of the file open as fd.
  */
 static int
-filesize (int fd)
+sysc_filesize (int fd)
 {
-  struct fdelem *fde = get_of_fd(fd);
+  struct fdelem *fde = get_tf_fd(fd);
 
-  if( fde == NULL )
-    {
-      return -1;
-    }
-  else
+  if( fde != NULL )
     {
       return file_length(fde->file);
     }
+
+  return ERROR;
 }
 
 /**
@@ -260,53 +284,52 @@ filesize (int fd)
  * @return
  */
 static int
-read (int fd, void *buffer, unsigned length)
+sysc_read (int fd, void *buffer, unsigned length)
 {
 
-  if (fd == 0)
+  if (fd == STDIN_FD)
       {
-        // TODO
+      unsigned int i;
+      for (i = 0; i != length; ++i)
+        {
+           *(char*)(buffer + i) = input_getc ();
+        }
+        return length;
       }
-    else if (fd == 1)
-    {
-      return -1;
-    }
   else
     {
-      struct fdelem *fde = get_of_fd(fd);
-
-      if( fde == NULL )
-        {
-          return -1;
-        }
-      else
+      struct fdelem *fde = get_tf_fd(fd);
+      if (fde != NULL && fd == STDOUT_FD)
         {
           return file_read(fde->file,buffer,length);
         }
     }
+
+  return ERROR;
 }
 
+/**
+ * @brief sysc_write
+ * @param fd
+ * @param buffer
+ * @param length
+ * @return
+ */
 static int
-write (int fd, const void *buffer, unsigned length)
+sysc_write (int fd, const void *buffer, unsigned length)
 {
 
-  if( fd == 0 )
+  if( is_user_vaddr (buffer) && is_user_vaddr (buffer + length) )
     {
-      return -1;
-    }
-  else
-    {
-     struct fdelem *fde = get_of_fd(fd);
+      struct fdelem *fde = get_tf_fd(fd);
 
-     if( fde == NULL )
-       {
-         return -1;
-       }
-     else
-       {
-         return file_write(fde->file, buffer, length);
-       }
+      if( fde != NULL )
+        {
+          return file_write(fde->file, buffer, length);
+        }
     }
+
+  return ERROR;
 }
 
 /**
@@ -317,26 +340,17 @@ write (int fd, const void *buffer, unsigned length)
  * @return
  */
 static int
-seek (int fd, unsigned position)
+sysc_seek (int fd, unsigned position)
 {
-  if( fd == 0 )
-    {
-      return -1;
-    }
-  else
-    {
-     struct fdelem *fde = get_of_fd(fd);
+   struct fdelem *fde = get_tf_fd(fd);
 
-     if( fde == NULL )
-       {
-         return -1;
-       }
-     else
-       {
-         file_seek(fde->file, position);
-         return 0;
-       }
-    }
+   if( fde != NULL )
+     {
+       file_seek(fde->file, position);
+       return SUCCESS;
+     }
+
+   return ERROR;
 }
 
 /**
@@ -346,25 +360,16 @@ seek (int fd, unsigned position)
  * expressed in bytes from the beginning of the file.
  */
 static int
-tell (int fd)
+sysc_tell (int fd)
 {
-  if( fd == 0 )
-    {
-      return -1;
-    }
-  else
-    {
-     struct fdelem *fde = get_of_fd(fd);
+  struct fdelem *fde = get_tf_fd(fd);
 
-     if( fde == NULL )
-       {
-         return -1;
-       }
-     else
-       {
-         return file_tell(fde->file);
-       }
+  if( fde != NULL )
+    {
+      return file_tell(fde->file);
     }
+
+  return ERROR;
 }
 
 /**
@@ -373,15 +378,18 @@ tell (int fd)
  * @return
  */
 static int
-close (int fd)
+sysc_close (int fd)
 {
-  int ret = -1;
   struct fdelem *fde = get_tf_fd(fd);
+  if( fde != NULL)
+    {
+      //  list_remove (fde->of_elem);
+      list_remove (&fde->thread_elem);
 
-//  list_remove (fde->of_elem);
-  list_remove (&fde->thread_elem);
+      return SUCCESS;
+    }
 
-  return ret;
+  return ERROR;
 }
 
 
@@ -390,34 +398,11 @@ close (int fd)
  * @return next available file descriptor
  */
 static int
-get_next_fd()
+get_next_fd(void)
 {
   return next_fd++;
 }
 
-
-/**
- * @brief get_of_fd
- * @param fd
- * @return struct fdelem
- */
-static struct fdelem*
-get_of_fd (int fd)
-{
-  struct list_elem *e;
-
-  for (e = list_begin (&open_files); e != list_end (&open_files);
-       e = list_next (e))
-    {
-      struct fdelem *fde = list_entry (e, struct fdelem, of_elem);
-      if( fde->fd == fd )
-        {
-          return fde;
-        }
-    }
-
-  return NULL;
-}
 
 
 /**

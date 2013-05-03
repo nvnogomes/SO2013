@@ -94,7 +94,7 @@ create (const char *file, unsigned initial_size)
 }
 
 bool
-remove (const char *file)
+sysc_remove (const char *file)
 {
   return syscall1 (SYS_REMOVE, file);
 }
